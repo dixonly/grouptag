@@ -1,0 +1,30 @@
+,names are case insensitive,,,,,,Any columns after _SEP_ in grey row  will be treated as a tag scope,,,
+,MultiVMTagScope row: Each subsequent column contains a tag scope for multiple tag values can be applied to a VM,,,,,,,,,
+MultiVMTagScope,App,,,,,,,,,
+ObjectType,Name,Match,GroupName,Resolve,Share,_SEP_,Site,AZ,Environment,App
+VM,vm-50-101-2-0002,,,FALSE,,,london,az1,production,web1
+VM,vm-54-101-1-,startswith,,FALSE,,,london,az1,nonprod,web1
+,This is a comment line because column A is blank,,,,,,,,,
+VM,003,endswith,,FALSE,,,paris,az2,noprod,web1
+VM,50-101-1,contains,,FALSE,,,paris,az1,production,web1
+VM,192.168.1.0/24,,,TRUE,,,newyork,az3,production,web2
+,,,,"when ""Resolve"" is true, will find all VMs with IPs in the CIDR",,,,,,
+IP,"54.11.11.1-54.11.11.5, 54.11.12.1-54.11.12.5",,,TRUE,,,sfo,az4,production,db1
+IP,"54.11.11.1-54.11.11.5, 54.11.12.1-54.11.12.5",,,TRUE,,,sfo5,az4,production,db1
+,,,,ObjectType IP will stay as IPSET,,,,,,
+IP,"54.11.21.0/24, 54.11.22.0/24",,,TRUE,,,sfo,az5,production,db2
+,,,,"When ""Resolve"" is False, will use the CIDR as an IPSET",,,,,,
+IP,"192.168.4.1-192.168.4.10, 192.168.6.1-192.168.7.1, 172.168.1.0/24",,,FALSE,,,,,,
+,,,,"When ""Resolve"" is False, will use the range as an IPSET",,,,,,
+"This is a comment because the first column is not ""VM"", SEGMENT, TIER1, TIER0, IP",,,,,,,,,,
+SEGMENT,Tenant1_Segment-54.11,startswith,,FALSE,,,sfo,az5,production,db2
+SEGMENT,Tenant2_Segment-54.12,startswith,Tenant2,FALSE,,,,,,
+,,,,Segment resolve=true means find all VMs on the segment and tag them,,,,,,
+,,,,Segment resolve=false means tag the segment and create groups based on segment tag,,,,,,
+TIER1,Tenant2T1-1,,,TRUE,,,sfo1,az5,prod,db2
+TIER0,JT0,,,FALSE,,,sfo2,az5,prod,db2
+,,,,T0/T1 resolve=true means find and tag all VMs under the span of the t0 or t1,,,,,,
+,,,,T0/T1 resolve=False means find and tag all segments under the span of the t0 or t1,,,,,,
+,,,,,,,,,,
+SEGMENT,Tenant2_Segment-54.12.22,contains,tenant2-2,TRUE,,,,,,
+,,,,,"The ""Share"" column - do we really need this? A VM showing up multiple times means it'll belong to multiple groups",,,,,
