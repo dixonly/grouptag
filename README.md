@@ -1,7 +1,7 @@
 ## Tools to Tag VMs and NSX Segments & Create NSX Groups using input from a CSV file
 
 NSX Firewall security rules have the basic format of:
-    <Source>  <Destination> <Services> <Action> <apply-to>
+    **Source  Destination Services Action apply-to**
     
 The Source, Destination, and apply-to are "grouping" definitions that can include IP addresses, Virtual Machines, NSX Networks, and so on.  The compute and network inventories that are members of these groups are dynamically changing all the time in a datacenter.  As such, the Source and Destination definitions should leverage dynamic grouping capabilities of NSX to ensure that their memberships are updated in real-time to inorder to gaurantee proper security posture.  The apply-to group is a policy or rule scope that will limit the application of the rule to only the VMs that are effective members of the group.  TheseGroups can be defined using, but not limited to:
   - Virtual Machine Tags: The group will be dynamically updated to include any newly added VM with the tags; similary, the removal of any VM with the same tags will be deleted from the group.
