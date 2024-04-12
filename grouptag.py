@@ -722,7 +722,6 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
     output["groups"] = []
     output["vms"] = []
     output["segments"] = []
-    output["vmscopes"] = []
     output["scopeheader"] = []
     output["scopes"] = []
     for i in range(scopeIndex, len(header)):

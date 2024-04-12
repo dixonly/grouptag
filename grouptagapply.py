@@ -53,7 +53,7 @@ def applySegmentTags(nsx, segments, remove):
                 nsx.patch(api=segment["url"], data=segment["payload"], verbose=True, codes=[200])
             
 
-def applyVMTags(nsx, scopes, remove, pagesize=7):
+def applyVMTags(nsx, scopes, remove, pagesize=1000):
     for scope in scopes:
         if not remove:
             for tag in scope["tags"]:
