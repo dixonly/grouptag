@@ -7,6 +7,7 @@ import getpass
 import ipaddress
 import uuid
 import copy
+#from urllib.parse import quote as urlnormalize
 from logger import Logger
 
 
@@ -51,7 +52,21 @@ def parseParameters():
     args = parser.parse_args()
     return args
 
-
+def urlnormalize(name, logger):
+    '''
+    Convert parameter name into value that is URL safe and acceptable for NSX Policy IDs.
+    Policy IDs do not accept space,  %, /, \, ., '.  Name also cannot be empty
+    '''
+    converts=[" ", "\"", "'", "%", "/", "\\", "."]
+    newChar="_"
+    newname=""
+    for i in name:
+        if i in converts:
+            i=newChar
+        newname+=i
+    #logger.info("Converting '%s' to '%s" %(name, newname))
+    return newname
+    
 
 def getAllVms(nsx):
     vms = nsx.get(api="/policy/api/v1/infra/realized-state/virtual-machines",
@@ -330,7 +345,7 @@ def createSegmentGroup(nsx, segments, row, header, logger, output):
     for t in range(scopeIndex, len(header)):
         if not row[t]:
             continue
-        tag = T.create(scope=header[t], value=row[t])
+        tag = T.create(scope=header[t], value=row[t].strip())
         tags = T.update(taglist=[tag], tags=tags)
         tagged = True
 
@@ -352,7 +367,7 @@ def createSegmentGroup(nsx, segments, row, header, logger, output):
             group["display_name"] = "SG_Segment_%s" % row[sgNameIndex]
         group["expression"].append(expr)
         groupapi={}
-        groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % group["display_name"]
+        groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % urlnormalize(group["display_name"], logger)
         groupapi["payload"] = group
         groupapi["method"] = "patch"
         groupapi["type"] = "group"
@@ -381,7 +396,7 @@ def createSegmentGroup(nsx, segments, row, header, logger, output):
 
 
             groupapi={}
-            groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % group["display_name"]
+            groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % urlnormalize(group["display_name"], logger)
             groupapi["payload"] = group
             groupapi["method"] = "patch"
             groupapi["type"] = "group"
@@ -420,7 +435,7 @@ def createVMGroup(row, vmlist, header, logger, output):
     for i in range(scopeIndex, len(header)):
         if not row[i]:
             continue
-        tag = T.create(scope=header[i], value=row[i])
+        tag = T.create(scope=header[i], value=row[i].strip())
         tags = T.update(taglist=[tag], tags=tags)
 
         
@@ -445,7 +460,7 @@ def createVMGroup(row, vmlist, header, logger, output):
             expr["expressions"] = expressions
             group["expression"] = [expr]
         groupapi={}
-        groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" %group["display_name"]
+        groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % urlnormalize(group["display_name"], logger)
         groupapi["payload"] = group
         groupapi["method"] = "patch"
         groupapi["type"] = "group"
@@ -466,7 +481,7 @@ def createVMGroup(row, vmlist, header, logger, output):
             expr["external_ids"].append(vm["external_id"])
         group["expression"] = [expr]
         groupapi={}
-        groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % group["display_name"]
+        groupapi["url"] = "/policy/api/v1/infra/domains/default/groups/%s" % urlnormalize(group["display_name"], logger)
         groupapi["payload"] = group
         groupapi["method"] = "patch"
         groupapi["type"]= "group"
@@ -553,7 +568,7 @@ def createIPGroup(nsx, name, ips, logger):
     group["display_name"] = name
         
     api={}
-    api['url'] = "/policy/api/v1/infra/domains/default/groups/%s" %name
+    api['url'] = "/policy/api/v1/infra/domains/default/groups/%s" %urlnormalize(name, logger)
     api['payload'] = group
     api['method'] = "patch"
     api["type"] = "group"
