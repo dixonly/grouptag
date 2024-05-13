@@ -113,7 +113,7 @@ options:
   -r, --remove          If specified, will delete the configurations pushed from input file
 ```
 The input file is the JSON output file from grouptag.py.
-If --globalmanager is specified along with the --group option, then groups will be creaed where --nsx is treated as a NSX Federatio Global Manager **Not complelted yet**
+If --globalmanager is specified along with the --group option, then groups will be creaed where --nsx is treated as a NSX Federatio Global Manager.  Note that GM's do not have visibility to non-global networks for direct memberships; however, they can create groups matching local segment's via tags.  As such, please ensure that any segment based membership must be tagged based.
 You must specify --vm, --segment, or --group.  
   - --vm means to apply all the relevant tags to VMs only
   - --segment means to apply all the relevant tags to Segments only
@@ -127,7 +127,5 @@ Both scripts will apppend to the logfile if it already exists.
 
 ### TBD 
 - I've only tested on the object happy path - meaning I may have to add handlers for cases where a VM may have been deleted in between the running of grouptag.py and grouptagapply.py.
-- I've yet to complete the global manager integration.  The library handler was taken from another successful project,but grouptag.py and grouptagapply.py needs some additional flags to make it work.
-
   
     

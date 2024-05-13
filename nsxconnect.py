@@ -88,7 +88,9 @@ class NsxConnect(requests.Request):
                 creds = creds.encode()
                 self.requestAttr['headers']['Authorization'] = 'Remote %s' % base64.b64encode(creds)
         if isNsx:
-            self.version = self.getVersion()
+            pass
+            # pass for now because this is not used and need handler for GM exception
+            #self.version = self.getVersion()
 
     def getVersion(self):
         # for API compatibility purposes, only get major and minor

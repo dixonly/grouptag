@@ -26,6 +26,8 @@ def parseParameters():
                         help="vm: tag VMs, segment: tag segments, group: create all groups")
     parser.add_argument("-r","--remove", action="store_true",
                         help="If specified, will delete the configurations pushed from input file")
+    parser.add_argument("--trial", action="store_true",
+                        help="If specified, will not send updates to NSX, just print")
 
     args = parser.parse_args()
     if args.globalmanager and args.mode != "group":
@@ -34,26 +36,29 @@ def parseParameters():
     return args
 
 
-def applyGroup(nsx, groups, remove):
+def applyGroup(nsx, groups, remove, trial=False):
     for group in groups:
         if not remove:
             if group["method"] == "patch":
-                nsx.patch(api=group["url"], data=group["payload"], verbose=True, codes=[200])
+                nsx.patch(api=group["url"], data=group["payload"],
+                          verbose=True, codes=[200], trial=trial)
         else:
-            nsx.delete(api=group["url"], verbose=True, codes=[200, 201])    
+            nsx.delete(api=group["url"], verbose=True, codes=[200, 201], trial=trial)    
 
-def applySegmentTags(nsx, segments, remove):
+def applySegmentTags(nsx, segments, remove, trial=False):
     for segment in segments:
         if not remove:
             if segment["method"] == "patch":
-                nsx.patch(api=segment["url"], data=segment["payload"], verbose=True, codes=[200])
+                nsx.patch(api=segment["url"], data=segment["payload"],
+                          verbose=True, codes=[200], trial=trial)
         else:
             if segment["method"] == "patch":
                 segment["payload"]["tags"] = segment["original_tags"]
-                nsx.patch(api=segment["url"], data=segment["payload"], verbose=True, codes=[200])
+                nsx.patch(api=segment["url"], data=segment["payload"],
+                          verbose=True, codes=[200], trial=trial)
             
 
-def applyVMTags(nsx, scopes, remove, pagesize=1000):
+def applyVMTags(nsx, scopes, remove, pagesize=1000, trial=False):
     for scope in scopes:
         if not remove:
             for tag in scope["tags"]:
@@ -63,7 +68,7 @@ def applyVMTags(nsx, scopes, remove, pagesize=1000):
                 while(cursor < len(vmlist)):
                     tag["apply_to"][0]["resource_ids"] = vmlist[cursor:cursor+pagesize]
                     api="/policy/api/v1/infra/tags/tag-operations/vm_tag_op_%s" % uuid.uuid4()
-                    nsx.put(api=api, data=tag, verbose=True, codes=[200])
+                    nsx.put(api=api, data=tag, verbose=True, codes=[200], trial=trial)
                     cursor+=pagesize
         else:
             for tag in scope["tagsremove"]:
@@ -72,7 +77,7 @@ def applyVMTags(nsx, scopes, remove, pagesize=1000):
                 while(cursor < len(vmlist)):
                     tag["remove_from"][0]["resource_ids"] = vmlist[cursor:cursor+pagesize]
                     api="/policy/api/v1/infra/tags/tag-operations/vm_tag_op_%s" % uuid.uuid4()
-                    nsx.put(api=api, data=tag, verbose=True, codes=[200])
+                    nsx.put(api=api, data=tag, verbose=True, codes=[200], trial=trial)
                     cursor+=pagesize
 
                 
@@ -85,14 +90,19 @@ def main():
         data = json.load(fp)
         fp.close()
 
-    nsx = NsxConnect(server=args.nsx, logger=logger,
-                     user=args.user, password=args.password)
+    if not args.globalmanager:
+        nsx = NsxConnect(server=args.nsx, logger=logger, 
+                         user=args.user, password=args.password)
+    else:
+        nsx = NsxConnect(server=args.nsx, logger=logger, global_infra=True, global_gm=True,
+                         user=args.user, password=args.password)
+        
     if args.mode == "group":
-        applyGroup(nsx, data["groups"], args.remove)
+        applyGroup(nsx, data["groups"], args.remove, trial=args.trial)
     elif args.mode == "vm":
-        applyVMTags(nsx, data["scopes"], args.remove)
+        applyVMTags(nsx, data["scopes"], args.remove, trial=args.trial)
     elif args.mode == "segment":
-        applySegmentTags(nsx, data["segments"], args.remove)
+        applySegmentTags(nsx, data["segments"], args.remove, trial=args.trial)
     
     
     
