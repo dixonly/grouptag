@@ -765,12 +765,16 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
 
         
     T = Tag()
+    totalVMs=0
+    totalIPs=0
+    totalNets=0
     for row in data:
         vmlist = []
         resolve=True
         newgroup=[]
         segments=[]
         if row[objIndex].strip().lower() == "ip":
+            totalIPs+=1
             ips = validateIP(row[nameIndex], logger)
             if len(ips) == 0:
                 logger.log(logger.ERROR,
@@ -783,8 +787,12 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
                 newgroup = createIPGroup(nsx=nsx, name=row[sgNameIndex],
                                             ips=ips, logger=logger)
         elif row[objIndex].strip().lower() == "vm":
+            totalVMs+=1
             vmlist = findVMsFromName(vms, row[nameIndex], row[matchIndex])
+            if len(vmlist) == 0:
+                logger.log(logger.INFO, "VM not found: %s" %row[nameIndex])
         else:
+            totalNets+=1
             if row[objIndex].strip().lower() not in ["segment", "tier0", "tier1"]:
                 logger.log(logger.ERROR, "Don't have handler for type %s" %row[objIndex])
                 exit()
@@ -854,6 +862,7 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
                     output["vms"] = updateVMs(output["vms"], i, logger)
 
     nsx.jsonPrint(output, stdout=True)
+    logger.log(logger.INFO, "Totals proccessed: VMs - %d, IPs - %d, Nets - %d" %(totalVMs, totalIPs, totalNets))
 def main():
     args = parseParameters()
     logger = Logger(args.logfile)
