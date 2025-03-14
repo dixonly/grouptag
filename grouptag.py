@@ -9,6 +9,7 @@ import uuid
 import copy
 #from urllib.parse import quote as urlnormalize
 from logger import Logger
+import json
 
 
 class Tag():
@@ -47,6 +48,7 @@ def parseParameters():
                         help="NSX user, defaults to admin")
     parser.add_argument("-p", "--password", required=False,
                         help="NSX user password")
+    parser.add_argument("-o", "--output", required=True, help="JSON output file")
     parser.add_argument("-l", "--logfile", required=False, default="logfile.txt")
     
     args = parser.parse_args()
@@ -78,14 +80,51 @@ def getAllVifs(nsx):
                   codes=[200], verbose=False,display=False)
     return vifs
 
+def findSegmentByIp(segments, iplist):
+    found = []
+    for s in segments:
+        matched=False
+        if not "subnets" in s.keys():
+            continue
+        for i in s["subnets"]:
+            for ipl in iplist:
+                thisnet = ipaddress.ip_interface(i["gateway_address"])
+                if ipl["type"] == "RANGE":
+                    if type(ipl["first"].network_address) == type(thisnet.ip):
+                        if thisnet.ip >= ipl['first'].network_address and thisnet.ip <= ipl['second'].broadcast_address:
+                            matched = True
+                            break
+                elif ipl["type"] == "CIDR":
+                    if thisnet in ipl['cidr']:
+                        matched=True
+                        break
+                elif ipl["type"] == "IP":
+                    if thisnet.ip == ipl['ip']:
+                        matched=True
+                        break
+                else:
+                    logger.error("Unrecognized IP type: should never be here")
+            if matched:
+                break
+        if matched:
+            found.append(s)
+    #print("Found matches")
+    #for i in found:
+    #    print("  " + i["path"])
+    return found
 
-def findNsxNetwork(nsx, objectType, logger, operator, name=None):
+def findNsxNetwork(nsx, objectType, logger, operator, name=None, ip=None):
     # operator can be startswith, endswith, contains, else match
-    if objectType.lower() not in ["segment", "tier1", "tier0"]:
+    if objectType.lower() not in ["segment", "tier1", "tier0", "network"]:
         logger.log(logger.WARN, "findNsxNetwork: unsupported type: "%objectType)
         return []
-    objs = nsx.get(api="/policy/api/v1/search/query?query=resource_type:%s" %objectType,
-                   verbose=False)
+    if objectType.lower() == "network":
+        objs = nsx.get(api="/policy/api/v1/search/query?query=resource_type:SEGMENT",
+                       verbose=False)
+    else:
+        objs = nsx.get(api="/policy/api/v1/search/query?query=resource_type:%s" %objectType,
+                       verbose=False)
+
     found =[]
     if name:
         for o in objs["results"]:
@@ -103,6 +142,10 @@ def findNsxNetwork(nsx, objectType, logger, operator, name=None):
                 if o["display_name"].strip().lower() == name.strip().lower():
                     found.append(o)
                     break
+        return found
+    elif ip:
+        iplist = validateIP(ip, logger, allowCIDRrange=True)
+        found = findSegmentByIp(objs["results"], iplist)
         return found
     else:
         return objs["results"]
@@ -574,7 +617,7 @@ def createIPGroup(nsx, name, ips, logger):
     api["type"] = "group"
     return [api]
 
-def validateIP(inputstr, logger):
+def validateIP(inputstr, logger, allowCIDRrange=False):
     # allow comma seprated list
     iplist=[]
     inputstr = inputstr.split(",")
@@ -586,18 +629,30 @@ def validateIP(inputstr, logger):
                 logger.log(logger.ERROR,
                            "Dash '-' in input %s, there must be only one dash separating two IP addresses" % i)
                 exit()
-            if '/' in iprange[0] or '/' in iprange[1]:
+            if ('/' in iprange[0] or '/' in iprange[1]) and not allowCIDRrange:
                 logger.log(logger.ERROR,
                            "Input IP range %s must not specify element with mask seperator '/'"
                       %i)
                 exit()
-
-            try:
-                first = ipaddress.ip_address(iprange[0].strip())
-                second = ipaddress.ip_address(iprange[1].strip())
-            except ValueError as e:
-                logger.log(logger.ERROR,"IP range %s has error:  %s" %(i, e))
-                exit()
+            elif allowCIDRrange:
+                if ('/' in iprange[0] and '/' not in iprange[1]) or ('/' in iprange[1] and '/' not in iprange[0]):
+                    logger.log(logger.ERROR,
+                               "Allow CIDR ange is set to true, but one of %s and %s is not a CIDR with a /" %(iprange[0], iprange[1]))
+                    exit()
+                else:
+                    try:
+                        first = ipaddress.ip_network(iprange[0].strip())
+                        second = ipaddress.ip_network(iprange[1].strip())
+                    except ValueError as e:
+                        logger.log(logger.ERROR, "IP range %s has error: %s" %(i,e))
+                        exit()
+            else:
+                try:
+                    first = ipaddress.ip_address(iprange[0].strip())
+                    second = ipaddress.ip_address(iprange[1].strip())
+                except ValueError as e:
+                    logger.log(logger.ERROR,"IP range %s has error:  %s" %(i, e))
+                    exit()
             if first >second:
                 logger.log(logger.ERROR, "IP %s in range %s is smaller than %s" %(first, i, second))
                 exit()
@@ -725,7 +780,7 @@ def compareTagExpressions(src, dst):
         return False
 
                             
-def associateGroups(nsx, header, multitag, data, vms, logger):
+def associateGroups(nsx, header, multitag, data, vms, logger, outfile):
     scopeIndex = findHeaderIndex(header=header, sep="_SEP_", logger=logger) + 1
     nameIndex = findHeaderIndex(header=header, sep="Name", logger=logger)
     matchIndex = findHeaderIndex(header=header, sep="Match", logger=logger)
@@ -792,15 +847,21 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
             if len(vmlist) == 0:
                 logger.log(logger.INFO, "VM not found: %s" %row[nameIndex])
         else:
-            totalNets+=1
-            if row[objIndex].strip().lower() not in ["segment", "tier0", "tier1"]:
+            if row[objIndex].strip().lower() not in ["segment", "tier0", "tier1", "network"]:
                 logger.log(logger.ERROR, "Don't have handler for type %s" %row[objIndex])
                 exit()
+            totalNets+=1
             if row[objIndex].strip().lower() == "segment":
                 segments.extend(findNsxNetwork(nsx=nsx, objectType="segment",
                                           logger=logger,
                                           operator=row[matchIndex].strip().lower(),
                                           name=row[nameIndex].strip()))
+            elif row[objIndex].strip().lower() == "network":
+                segments.extend(findNsxNetwork(nsx=nsx, objectType="network",
+                                               logger=logger,
+                                               operator=row[matchIndex].strip().lower(),
+                                               name=None,
+                                               ip=row[nameIndex].strip()))
             else:
                 gw = findNsxNetwork(nsx=nsx, objectType=row[objIndex].strip().lower(),
                                     operator=row[matchIndex].strip().lower(),
@@ -835,7 +896,7 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
                                     segments.append(segment)
 
 
-            if row[resolveIndex].strip().lower() == "true":
+            if row[objIndex].strip().lower() !="network" and row[resolveIndex].strip().lower() == "true":
                 vmlist = findSegmentAttachedVMs(nsx, segments, vms, logger)
             else:
                 resolve=False
@@ -861,7 +922,10 @@ def associateGroups(nsx, header, multitag, data, vms, logger):
                 elif i["type"] == "vm":
                     output["vms"] = updateVMs(output["vms"], i, logger)
 
-    nsx.jsonPrint(output, stdout=True)
+    #nsx.jsonPrint(output, stdout=True)
+    with open(outfile, "w") as fp:
+        fp.write(json.dumps(output, indent=4))
+        fp.close()
     logger.log(logger.INFO, "Totals proccessed: VMs - %d, IPs - %d, Nets - %d" %(totalVMs, totalIPs, totalNets))
 def main():
     args = parseParameters()
@@ -888,7 +952,7 @@ def main():
             logger.info("multitags: %s" %multitag)
         if not header:
             continue
-        if row[objIndex].strip().lower() in ["vm", "ip", "segment", "tier0", "tier1"]:
+        if row[objIndex].strip().lower() in ["vm", "ip", "segment", "tier0", "tier1", "network"]:
             vmRows.append(row)
     if not header:
         logger.log(logger.ERROR, "No header row found in CSV")
@@ -905,7 +969,7 @@ def main():
         pass
         
     # header[3] is first tag scope
-    groups=associateGroups(nsx, header, multitag, vmRows, nsxVms['results'], logger)
+    groups=associateGroups(nsx, header, multitag, vmRows, nsxVms['results'], logger, args.output)
     
 if __name__ == "__main__":
     main()
