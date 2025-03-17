@@ -1,4 +1,4 @@
-#/usr/bin/env python3
+#!/usr/bin/env python3
 import sys
 import csv
 import argparse
@@ -22,8 +22,8 @@ def parseParameters():
     parser.add_argument("-l", "--logfile", required=False, default="logfile.txt")
     parser.add_argument("-g", "--globalmanager", required=False, action="store_true",
                          help="Sent group creation to global manager, --nsx must point to GM, works only with --mode=group")
-    parser.add_argument("-m", "--mode", choices=["vm", "segment", "group"], required=True,
-                        help="vm: tag VMs, segment: tag segments, group: create all groups")
+    parser.add_argument("-m", "--mode", choices=["vm", "segment", "group", "all"], required=True,
+                        help="vm: tag VMs, segment: tag segments, group: create all groups, all: apply groups, vm tags, segment tags")
     parser.add_argument("-r","--remove", action="store_true",
                         help="If specified, will delete the configurations pushed from input file")
     parser.add_argument("--trial", action="store_true",
@@ -103,6 +103,11 @@ def main():
         applyVMTags(nsx, data["scopes"], args.remove, trial=args.trial)
     elif args.mode == "segment":
         applySegmentTags(nsx, data["segments"], args.remove, trial=args.trial)
+    elif args.mode == 'all':
+        applyGroup(nsx, data["groups"], args.remove, trial=args.trial)
+        applyVMTags(nsx, data["scopes"], args.remove, trial=args.trial)
+        applySegmentTags(nsx, data["segments"], args.remove, trial=args.trial)
+
     
     
     
