@@ -96,9 +96,9 @@ output.json
 ### grouptagapply.py syntax
 ```
 $ python3 grouptagapply.py -h
-usage: grouptagapply.py [-h] -i INPUT -n NSX [-u USER] [-p PASSWORD] [-l LOGFILE] [-g] -m {vm,segment,group} [-r]
+usage: grouptagapply.py [-h] -i INPUT -n NSX [-u USER] [-p PASSWORD] [-l LOGFILE] [-g] -m {vm,segment,group,all} [-r] [--rfilter RFILTER] [--trial]
 
-options:
+optional arguments:
   -h, --help            show this help message and exit
   -i INPUT, --input INPUT
                         JSON file
@@ -108,10 +108,13 @@ options:
                         NSX user password
   -l LOGFILE, --logfile LOGFILE
   -g, --globalmanager   Sent group creation to global manager, --nsx must point to GM, works only with --mode=group
-  -m {vm,segment,group}, --mode {vm,segment,group}
-                        vm: tag VMs, segment: tag segments, group: create all groups
+  -m {vm,segment,group,all}, --mode {vm,segment,group,all}
+                        vm: tag VMs, segment: tag segments, group: create all groups, all: apply groups, vm tags, segment tags
   -r, --remove          If specified, will delete the configurations pushed from input file
+  --rfilter RFILTER     If -r is specified, file containing list of --vms tags, --segment tags, or groups to removed
+  --trial               If specified, will not send updates to NSX, just print
 ```
+
 The input file is the JSON output file from grouptag.py.
 If --globalmanager is specified along with the --group option, then groups will be creaed where --nsx is treated as a NSX Federatio Global Manager.  Note that GM's do not have visibility to non-global networks for direct memberships; however, they can create groups matching local segment's via tags.  As such, please ensure that any segment based membership must be tagged based.
 You must specify --vm, --segment, or --group.  
@@ -119,7 +122,7 @@ You must specify --vm, --segment, or --group.
   - --segment means to apply all the relevant tags to Segments only
   - --group means to create all the groups only
 
-If the --remove option is specified, then the script will remove all the tags that have been applied for VM if --vm is also specified or segments if --segment is also specified.  If --group is specified, then the groups will be deleted.  Note, however, that if a group is already being used by other features like firewall rules, then NSX will leave delete option in pending state until the feature that uses it has also been updated to exclude the use of the group.
+If the --remove option is specified, then the script will remove all the tags that have been applied for VM if --vm is also specified or segments if --segment is also specified.  If --group is specified, then the groups will be deleted.  Note, however, that if a group is already being used by other features like firewall rules, then NSX will leave delete option in pending state until the feature that uses it has also been updated to exclude the use of the group.  If the --rfilter is specified, it points to a text file or CSV file where each line of the file or first column of every row points to the name of the group, vm, or segment to apply for the --remmove action.
 
 The script will output all API logs to the specified logfile or logfile.txt.
 
